@@ -32,7 +32,7 @@ import org.skywalking.apm.collector.storage.elasticsearch.dao.EsDAODefineLoader;
 import org.skywalking.apm.collector.storage.elasticsearch.define.ElasticSearchStorageInstaller;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class StorageElasticSearchModuleDefine extends StorageModuleDefine {
 
@@ -44,6 +44,10 @@ public class StorageElasticSearchModuleDefine extends StorageModuleDefine {
 
     @Override public String name() {
         return MODULE_NAME;
+    }
+
+    @Override public final boolean defaultModule() {
+        return false;
     }
 
     @Override protected ModuleConfigParser configParser() {

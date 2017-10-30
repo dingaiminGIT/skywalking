@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class TraceSegmentServletHandler extends JettyHandler {
 
@@ -66,7 +66,7 @@ public class TraceSegmentServletHandler extends JettyHandler {
         while (reader.hasNext()) {
             SegmentParse segmentParse = new SegmentParse();
             TraceSegment traceSegment = jsonReader.read(reader);
-            segmentParse.parse(traceSegment.getGlobalTraceIds(), traceSegment.getTraceSegmentObject());
+            segmentParse.parse(traceSegment.getUpstreamSegment(), SegmentParse.Source.Agent);
         }
         reader.endArray();
     }

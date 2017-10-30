@@ -34,7 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class CollectorStarter implements Starter {
 
@@ -53,6 +53,9 @@ public class CollectorStarter implements Starter {
 
         ServerHolder serverHolder = new ServerHolder();
         for (ModuleGroupDefine moduleGroupDefine : moduleGroupDefineMap.values()) {
+            if (moduleGroupDefine.groupConfigParser() != null) {
+                moduleGroupDefine.groupConfigParser().parse(configuration.get(moduleGroupDefine.name()));
+            }
             moduleGroupDefine.moduleInstaller().injectConfiguration(configuration.get(moduleGroupDefine.name()), moduleDefineMap.get(moduleGroupDefine.name()));
             moduleGroupDefine.moduleInstaller().injectServerHolder(serverHolder);
             moduleGroupDefine.moduleInstaller().preInstall();

@@ -39,12 +39,11 @@ import org.skywalking.apm.collector.ui.jetty.handler.instancemetric.InstanceMetr
 import org.skywalking.apm.collector.ui.jetty.handler.instancemetric.InstanceOsInfoGetHandler;
 import org.skywalking.apm.collector.ui.jetty.handler.servicetree.EntryServiceGetHandler;
 import org.skywalking.apm.collector.ui.jetty.handler.servicetree.ServiceTreeGetByIdHandler;
-import org.skywalking.apm.collector.ui.jetty.handler.servicetree.ServiceTreeGetByNameHandler;
 import org.skywalking.apm.collector.ui.jetty.handler.time.AllInstanceLastTimeGetHandler;
 import org.skywalking.apm.collector.ui.jetty.handler.time.OneInstanceLastTimeGetHandler;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class UIJettyModuleDefine extends UIModuleDefine {
 
@@ -89,7 +88,6 @@ public class UIJettyModuleDefine extends UIModuleDefine {
         handlers.add(new InstanceMetricGetRangeTimeBucketHandler());
         handlers.add(new EntryServiceGetHandler());
         handlers.add(new ServiceTreeGetByIdHandler());
-        handlers.add(new ServiceTreeGetByNameHandler());
         return handlers;
     }
 }

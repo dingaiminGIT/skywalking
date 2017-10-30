@@ -18,10 +18,11 @@
 
 package org.skywalking.apm.collector.core.module;
 
+import org.skywalking.apm.collector.core.config.GroupConfigParser;
 import org.skywalking.apm.collector.core.framework.Context;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public interface ModuleGroupDefine {
     String name();
@@ -29,4 +30,6 @@ public interface ModuleGroupDefine {
     Context groupContext();
 
     ModuleInstaller moduleInstaller();
+
+    GroupConfigParser groupConfigParser();
 }

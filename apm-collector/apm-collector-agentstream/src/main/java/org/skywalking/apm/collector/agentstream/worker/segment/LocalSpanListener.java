@@ -18,11 +18,11 @@
 
 package org.skywalking.apm.collector.agentstream.worker.segment;
 
-import org.skywalking.apm.network.proto.SpanObject;
+import org.skywalking.apm.collector.agentstream.worker.segment.standardization.SpanDecorator;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public interface LocalSpanListener extends SpanListener {
-    void parseLocal(SpanObject spanObject, int applicationId, int applicationInstanceId, String segmentId);
+    void parseLocal(SpanDecorator spanDecorator, int applicationId, int applicationInstanceId, String segmentId);
 }

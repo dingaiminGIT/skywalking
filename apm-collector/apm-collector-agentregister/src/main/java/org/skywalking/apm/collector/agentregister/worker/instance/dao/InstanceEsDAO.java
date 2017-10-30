@@ -20,7 +20,6 @@ package org.skywalking.apm.collector.agentregister.worker.instance.dao;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
@@ -38,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class InstanceEsDAO extends EsDAO implements IInstanceDAO {
 
@@ -100,14 +99,5 @@ public class InstanceEsDAO extends EsDAO implements IInstanceDAO {
 
         updateRequest.doc(source);
         client.update(updateRequest);
-    }
-
-    @Override public int getApplicationId(int applicationInstanceId) {
-        GetResponse response = getClient().prepareGet(InstanceTable.TABLE, String.valueOf(applicationInstanceId)).get();
-        if (response.isExists()) {
-            return (int)response.getSource().get(InstanceTable.COLUMN_APPLICATION_ID);
-        } else {
-            return 0;
-        }
     }
 }

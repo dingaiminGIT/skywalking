@@ -19,7 +19,7 @@
 package org.skywalking.apm.collector.agentregister.servicename;
 
 import org.skywalking.apm.collector.agentregister.worker.servicename.ServiceNameRegisterRemoteWorker;
-import org.skywalking.apm.collector.agentregister.worker.servicename.dao.IServiceNameDAO;
+import org.skywalking.apm.collector.cache.dao.IServiceNameCacheDAO;
 import org.skywalking.apm.collector.core.framework.CollectorContextHelper;
 import org.skywalking.apm.collector.storage.dao.DAOContainer;
 import org.skywalking.apm.collector.storage.define.register.ServiceNameDataDefine;
@@ -31,14 +31,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class ServiceNameService {
 
     private final Logger logger = LoggerFactory.getLogger(ServiceNameService.class);
 
     public int getOrCreate(int applicationId, String serviceName) {
-        IServiceNameDAO dao = (IServiceNameDAO)DAOContainer.INSTANCE.get(IServiceNameDAO.class.getName());
+        IServiceNameCacheDAO dao = (IServiceNameCacheDAO)DAOContainer.INSTANCE.get(IServiceNameCacheDAO.class.getName());
         int serviceId = dao.getServiceId(applicationId, serviceName);
 
         if (serviceId == 0) {

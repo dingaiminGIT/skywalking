@@ -19,7 +19,7 @@
 package org.skywalking.apm.collector.agentregister.application;
 
 import org.skywalking.apm.collector.agentregister.worker.application.ApplicationRegisterRemoteWorker;
-import org.skywalking.apm.collector.agentregister.worker.cache.ApplicationCache;
+import org.skywalking.apm.collector.cache.ApplicationCache;
 import org.skywalking.apm.collector.core.framework.CollectorContextHelper;
 import org.skywalking.apm.collector.storage.define.register.ApplicationDataDefine;
 import org.skywalking.apm.collector.stream.StreamModuleContext;
@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class ApplicationIDService {
 

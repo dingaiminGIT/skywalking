@@ -21,7 +21,7 @@ package org.skywalking.apm.collector.agentregister.worker.instance.dao;
 import org.skywalking.apm.collector.storage.define.register.InstanceDataDefine;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public interface IInstanceDAO {
     int getInstanceId(int applicationId, String agentUUID);
@@ -33,6 +33,4 @@ public interface IInstanceDAO {
     void save(InstanceDataDefine.Instance instance);
 
     void updateHeartbeatTime(int instanceId, long heartbeatTime);
-
-    int getApplicationId(int applicationInstanceId);
 }

@@ -32,7 +32,7 @@ import org.skywalking.apm.collector.storage.h2.dao.H2DAODefineLoader;
 import org.skywalking.apm.collector.storage.h2.define.H2StorageInstaller;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class StorageH2ModuleDefine extends StorageModuleDefine {
 
@@ -44,6 +44,10 @@ public class StorageH2ModuleDefine extends StorageModuleDefine {
 
     @Override public String name() {
         return MODULE_NAME;
+    }
+
+    @Override public final boolean defaultModule() {
+        return true;
     }
 
     @Override protected ModuleConfigParser configParser() {

@@ -18,12 +18,13 @@
 
 package org.skywalking.apm.collector.storage;
 
+import org.skywalking.apm.collector.core.config.GroupConfigParser;
 import org.skywalking.apm.collector.core.framework.Context;
 import org.skywalking.apm.collector.core.module.ModuleGroupDefine;
 import org.skywalking.apm.collector.core.module.ModuleInstaller;
 
 /**
- * @author pengys5
+ * @author peng-yongsheng
  */
 public class StorageModuleGroupDefine implements ModuleGroupDefine {
 
@@ -44,5 +45,9 @@ public class StorageModuleGroupDefine implements ModuleGroupDefine {
 
     @Override public ModuleInstaller moduleInstaller() {
         return installer;
+    }
+
+    @Override public GroupConfigParser groupConfigParser() {
+        return null;
     }
 }
