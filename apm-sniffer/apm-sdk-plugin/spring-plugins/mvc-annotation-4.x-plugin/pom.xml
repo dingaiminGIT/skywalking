@@ -21,7 +21,7 @@
     <parent>
         <artifactId>spring-plugins</artifactId>
         <groupId>org.skywalking</groupId>
-        <version>3.2.3-2017</version>
+        <version>3.2.4-2017</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -36,18 +36,18 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-core</artifactId>
             <version>4.3.10.RELEASE</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webmvc</artifactId>
             <version>4.3.8.RELEASE</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.0-b01</version>
+            <version>3.0.1</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
