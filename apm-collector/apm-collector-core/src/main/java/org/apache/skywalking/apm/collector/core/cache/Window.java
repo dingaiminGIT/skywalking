@@ -16,7 +16,6 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.core.cache;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -70,6 +69,10 @@ public abstract class Window<WINDOW_COLLECTION extends Collection> {
 
     protected WINDOW_COLLECTION getCurrent() {
         return pointer;
+    }
+
+    public int currentCollectionSize() {
+        return getCurrent().size();
     }
 
     public WINDOW_COLLECTION getLast() {

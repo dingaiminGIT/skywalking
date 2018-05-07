@@ -16,17 +16,19 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.storage.es.base.dao;
 
 import java.util.List;
 import org.apache.skywalking.apm.collector.client.elasticsearch.ElasticSearchClient;
+import org.apache.skywalking.apm.collector.core.annotations.trace.BatchParameter;
+import org.apache.skywalking.apm.collector.core.annotations.trace.GraphComputingMetric;
 import org.apache.skywalking.apm.collector.core.util.CollectionUtils;
+import org.apache.skywalking.apm.collector.storage.base.dao.IBatchDAO;
+import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.update.UpdateRequestBuilder;
-import org.apache.skywalking.apm.collector.storage.base.dao.IBatchDAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,24 +43,29 @@ public class BatchEsDAO extends EsDAO implements IBatchDAO {
         super(client);
     }
 
-    @Override public void batchPersistence(List<?> batchCollection) {
-        BulkRequestBuilder bulkRequest = getClient().prepareBulk();
-
-        logger.debug("bulk data size: {}", batchCollection.size());
+    @GraphComputingMetric(name = "/persistence/batchPersistence/")
+    @Override public void batchPersistence(@BatchParameter List<?> batchCollection) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("bulk data size: {}", batchCollection.size());
+        }
         if (CollectionUtils.isNotEmpty(batchCollection)) {
-            for (int i = 0; i < batchCollection.size(); i++) {
-                Object builder = batchCollection.get(i);
+            BulkRequestBuilder bulkRequest = getClient().prepareBulk();
+
+            batchCollection.forEach(builder -> {
                 if (builder instanceof IndexRequestBuilder) {
                     bulkRequest.add((IndexRequestBuilder)builder);
                 }
                 if (builder instanceof UpdateRequestBuilder) {
                     bulkRequest.add((UpdateRequestBuilder)builder);
                 }
-            }
+            });
 
             BulkResponse bulkResponse = bulkRequest.execute().actionGet();
             if (bulkResponse.hasFailures()) {
                 logger.error(bulkResponse.buildFailureMessage());
+                for (BulkItemResponse itemResponse : bulkResponse.getItems()) {
+                    logger.error("Bulk request failure, index: {}, id: {}", itemResponse.getIndex(), itemResponse.getId());
+                }
             }
         }
     }

@@ -16,7 +16,6 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.storage.es.define;
 
 import org.apache.skywalking.apm.collector.storage.es.base.define.ElasticSearchColumnDefine;
@@ -33,12 +32,12 @@ public class GlobalTraceEsTableDefine extends ElasticSearchTableDefine {
     }
 
     @Override public int refreshInterval() {
-        return 5;
+        return 10;
     }
 
     @Override public void initialize() {
-        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.COLUMN_SEGMENT_ID, ElasticSearchColumnDefine.Type.Keyword.name()));
-        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.COLUMN_GLOBAL_TRACE_ID, ElasticSearchColumnDefine.Type.Keyword.name()));
-        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.COLUMN_TIME_BUCKET, ElasticSearchColumnDefine.Type.Long.name()));
+        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.SEGMENT_ID, ElasticSearchColumnDefine.Type.Keyword.name()));
+        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.TRACE_ID, ElasticSearchColumnDefine.Type.Keyword.name()));
+        addColumn(new ElasticSearchColumnDefine(GlobalTraceTable.TIME_BUCKET, ElasticSearchColumnDefine.Type.Long.name()));
     }
 }

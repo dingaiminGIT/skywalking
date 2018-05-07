@@ -16,14 +16,15 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.boot;
 
 import org.apache.skywalking.apm.collector.boot.config.ApplicationConfigLoader;
 import org.apache.skywalking.apm.collector.boot.config.ConfigFileNotFoundException;
 import org.apache.skywalking.apm.collector.core.module.ApplicationConfiguration;
+import org.apache.skywalking.apm.collector.core.module.ModuleConfigException;
 import org.apache.skywalking.apm.collector.core.module.ModuleManager;
 import org.apache.skywalking.apm.collector.core.module.ModuleNotFoundException;
+import org.apache.skywalking.apm.collector.core.module.ModuleStartException;
 import org.apache.skywalking.apm.collector.core.module.ProviderNotFoundException;
 import org.apache.skywalking.apm.collector.core.module.ServiceNotProvidedException;
 import org.slf4j.Logger;
@@ -42,19 +43,9 @@ public class CollectorBootStartUp {
         try {
             ApplicationConfiguration applicationConfiguration = configLoader.load();
             manager.init(applicationConfiguration);
-        } catch (ConfigFileNotFoundException e) {
+        } catch (ConfigFileNotFoundException | ModuleNotFoundException | ProviderNotFoundException | ServiceNotProvidedException | ModuleConfigException | ModuleStartException e) {
             logger.error(e.getMessage(), e);
-        } catch (ModuleNotFoundException e) {
-            logger.error(e.getMessage(), e);
-        } catch (ProviderNotFoundException e) {
-            logger.error(e.getMessage(), e);
-        } catch (ServiceNotProvidedException e) {
-            logger.error(e.getMessage(), e);
-        }
-
-        try {
-            Thread.sleep(60000);
-        } catch (InterruptedException e) {
+            System.exit(1);
         }
     }
 }

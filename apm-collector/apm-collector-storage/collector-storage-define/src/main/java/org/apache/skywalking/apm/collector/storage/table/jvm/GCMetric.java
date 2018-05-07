@@ -16,42 +16,56 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.storage.table.jvm;
 
-import org.apache.skywalking.apm.collector.core.data.Column;
-import org.apache.skywalking.apm.collector.core.data.Data;
-import org.apache.skywalking.apm.collector.core.data.operator.CoverOperation;
-import org.apache.skywalking.apm.collector.core.data.operator.NonOperation;
+import org.apache.skywalking.apm.collector.core.data.*;
+import org.apache.skywalking.apm.collector.core.data.operator.*;
 
 /**
  * @author peng-yongsheng
  */
-public class GCMetric extends Data {
+public class GCMetric extends StreamData {
 
     private static final Column[] STRING_COLUMNS = {
-        new Column(GCMetricTable.COLUMN_ID, new NonOperation()),
+        new Column(GCMetricTable.ID, new NonMergeOperation()),
+        new Column(GCMetricTable.METRIC_ID, new NonMergeOperation()),
     };
 
     private static final Column[] LONG_COLUMNS = {
-        new Column(GCMetricTable.COLUMN_COUNT, new CoverOperation()),
-        new Column(GCMetricTable.COLUMN_TIME, new CoverOperation()),
-        new Column(GCMetricTable.COLUMN_TIME_BUCKET, new CoverOperation()),
+        new Column(GCMetricTable.COUNT, new AddMergeOperation()),
+        new Column(GCMetricTable.TIMES, new AddMergeOperation()),
+        new Column(GCMetricTable.TIME_BUCKET, new CoverMergeOperation()),
+        new Column(GCMetricTable.DURATION, new AddMergeOperation()),
     };
 
     private static final Column[] DOUBLE_COLUMNS = {
     };
 
     private static final Column[] INTEGER_COLUMNS = {
-        new Column(GCMetricTable.COLUMN_INSTANCE_ID, new CoverOperation()),
-        new Column(GCMetricTable.COLUMN_PHRASE, new CoverOperation()),
+        new Column(GCMetricTable.INSTANCE_ID, new CoverMergeOperation()),
+        new Column(GCMetricTable.PHRASE, new CoverMergeOperation()),
     };
 
-    private static final Column[] BOOLEAN_COLUMNS = {};
     private static final Column[] BYTE_COLUMNS = {};
 
-    public GCMetric(String id) {
-        super(id, STRING_COLUMNS, LONG_COLUMNS, DOUBLE_COLUMNS, INTEGER_COLUMNS, BOOLEAN_COLUMNS, BYTE_COLUMNS);
+    public GCMetric() {
+        super(STRING_COLUMNS, LONG_COLUMNS, DOUBLE_COLUMNS, INTEGER_COLUMNS, BYTE_COLUMNS);
+    }
+
+    @Override public String getId() {
+        return getDataString(0);
+    }
+
+    @Override public void setId(String id) {
+        setDataString(0, id);
+    }
+
+    @Override public String getMetricId() {
+        return getDataString(1);
+    }
+
+    @Override public void setMetricId(String metricId) {
+        setDataString(1, metricId);
     }
 
     public Long getCount() {
@@ -62,12 +76,12 @@ public class GCMetric extends Data {
         setDataLong(0, count);
     }
 
-    public Long getTime() {
+    public Long getTimes() {
         return getDataLong(1);
     }
 
-    public void setTime(Long time) {
-        setDataLong(1, time);
+    public void setTimes(Long times) {
+        setDataLong(1, times);
     }
 
     public Long getTimeBucket() {
@@ -76,6 +90,14 @@ public class GCMetric extends Data {
 
     public void setTimeBucket(Long timeBucket) {
         setDataLong(2, timeBucket);
+    }
+
+    public Long getDuration() {
+        return getDataLong(3);
+    }
+
+    public void setDuration(Long duration) {
+        setDataLong(3, duration);
     }
 
     public Integer getInstanceId() {

@@ -6,7 +6,6 @@
       <version>{project.release.version}</version>
    </dependency>
 ```
-&nbsp;&nbsp;&nbsp;[ ![Download](https://api.bintray.com/packages/wu-sheng/skywalking/org.apache.skywalking.apm-toolkit-log4j-2.x/images/download.svg) ](https://bintray.com/wu-sheng/skywalking/org.apache.skywalking.apm-toolkit-log4j-2.x/_latestVersion)
 
 * Config the `[%traceId]` pattern in your log4j2.xml
 ```xml
@@ -16,4 +15,4 @@
       </Console>
    </Appenders>
 ```
-* When you use `-javaagent` to active the sky-waking tracer, log4j2 will output **traceId**, if it existed. If the tracer is inactive, the output will be `TID: N/A`.
+* When you use `-javaagent` to active the sky-walking tracer, log4j2 will output **traceId**, if it existed. If the tracer is inactive, the output will be `TID: N/A`.

@@ -16,11 +16,10 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.storage.h2.define;
 
-import org.apache.skywalking.apm.collector.storage.h2.base.define.H2TableDefine;
 import org.apache.skywalking.apm.collector.storage.h2.base.define.H2ColumnDefine;
+import org.apache.skywalking.apm.collector.storage.h2.base.define.H2TableDefine;
 import org.apache.skywalking.apm.collector.storage.table.global.GlobalTraceTable;
 
 /**
@@ -33,9 +32,9 @@ public class GlobalTraceH2TableDefine extends H2TableDefine {
     }
 
     @Override public void initialize() {
-        addColumn(new H2ColumnDefine(GlobalTraceTable.COLUMN_ID, H2ColumnDefine.Type.Varchar.name()));
-        addColumn(new H2ColumnDefine(GlobalTraceTable.COLUMN_SEGMENT_ID, H2ColumnDefine.Type.Varchar.name()));
-        addColumn(new H2ColumnDefine(GlobalTraceTable.COLUMN_GLOBAL_TRACE_ID, H2ColumnDefine.Type.Varchar.name()));
-        addColumn(new H2ColumnDefine(GlobalTraceTable.COLUMN_TIME_BUCKET, H2ColumnDefine.Type.Bigint.name()));
+        addColumn(new H2ColumnDefine(GlobalTraceTable.ID, H2ColumnDefine.Type.Varchar.name()));
+        addColumn(new H2ColumnDefine(GlobalTraceTable.SEGMENT_ID, H2ColumnDefine.Type.Varchar.name()));
+        addColumn(new H2ColumnDefine(GlobalTraceTable.TRACE_ID, H2ColumnDefine.Type.Varchar.name()));
+        addColumn(new H2ColumnDefine(GlobalTraceTable.TIME_BUCKET, H2ColumnDefine.Type.Bigint.name()));
     }
 }

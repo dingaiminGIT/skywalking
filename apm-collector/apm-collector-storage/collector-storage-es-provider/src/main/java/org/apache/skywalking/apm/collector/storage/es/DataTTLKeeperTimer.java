@@ -16,38 +16,44 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.storage.es;
 
 import java.util.Calendar;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import org.apache.skywalking.apm.collector.storage.dao.IInstanceMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IMemoryPoolMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IServiceReferenceMetricPersistenceDAO;
+import java.util.concurrent.*;
 import org.apache.skywalking.apm.collector.core.module.ModuleManager;
+import org.apache.skywalking.apm.collector.core.util.TimeBucketUtils;
 import org.apache.skywalking.apm.collector.storage.StorageModule;
-import org.apache.skywalking.apm.collector.storage.dao.IApplicationComponentPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IApplicationMappingPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IApplicationReferenceMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.ICpuMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IGCMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IGlobalTracePersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.IMemoryMetricPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.ISegmentCostPersistenceDAO;
-import org.apache.skywalking.apm.collector.storage.dao.ISegmentPersistenceDAO;
+import org.apache.skywalking.apm.collector.storage.dao.*;
+import org.apache.skywalking.apm.collector.storage.dao.acp.*;
+import org.apache.skywalking.apm.collector.storage.dao.alarm.*;
+import org.apache.skywalking.apm.collector.storage.dao.amp.*;
+import org.apache.skywalking.apm.collector.storage.dao.ampp.*;
+import org.apache.skywalking.apm.collector.storage.dao.armp.*;
+import org.apache.skywalking.apm.collector.storage.dao.cpu.*;
+import org.apache.skywalking.apm.collector.storage.dao.gc.*;
+import org.apache.skywalking.apm.collector.storage.dao.imp.*;
+import org.apache.skywalking.apm.collector.storage.dao.impp.*;
+import org.apache.skywalking.apm.collector.storage.dao.irmp.*;
+import org.apache.skywalking.apm.collector.storage.dao.memory.*;
+import org.apache.skywalking.apm.collector.storage.dao.mpool.*;
+import org.apache.skywalking.apm.collector.storage.dao.rtd.*;
+import org.apache.skywalking.apm.collector.storage.dao.smp.*;
+import org.apache.skywalking.apm.collector.storage.dao.srmp.*;
+import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
+import org.slf4j.*;
 
 /**
  * @author peng-yongsheng
  */
-public class DataTTLKeeperTimer {
+class DataTTLKeeperTimer {
+    private static final Logger logger = LoggerFactory.getLogger(StorageModuleEsProvider.class);
 
     private final ModuleManager moduleManager;
     private final StorageModuleEsNamingListener namingListener;
     private final String selfAddress;
     private final int daysBefore;
 
-    public DataTTLKeeperTimer(ModuleManager moduleManager,
+    DataTTLKeeperTimer(ModuleManager moduleManager,
         StorageModuleEsNamingListener namingListener, String selfAddress, int daysBefore) {
         this.moduleManager = moduleManager;
         this.namingListener = namingListener;
@@ -55,65 +61,180 @@ public class DataTTLKeeperTimer {
         this.daysBefore = daysBefore;
     }
 
-    public void start() {
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(this::delete, 1, 8, TimeUnit.HOURS);
+    void start() {
+        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(
+            new RunnableWithExceptionProtection(this::delete,
+                t -> logger.error("Remove data in background failure.", t)), 1, 8, TimeUnit.HOURS);
     }
 
     private void delete() {
+        if (!namingListener.getAddresses().iterator().next().equals(selfAddress)) {
+            return;
+        }
+
+        TimeBuckets timeBuckets = convertTimeBucket();
+
+        deleteJVMRelatedData(timeBuckets);
+        deleteTraceRelatedData(timeBuckets);
+        deleteAlarmRelatedData(timeBuckets);
+    }
+
+    TimeBuckets convertTimeBucket() {
         Calendar calendar = Calendar.getInstance();
         calendar.setTimeInMillis(System.currentTimeMillis());
-        calendar.set(Calendar.DAY_OF_MONTH, -daysBefore);
+        calendar.add(Calendar.DAY_OF_MONTH, -daysBefore);
         calendar.set(Calendar.HOUR_OF_DAY, 0);
         calendar.set(Calendar.MINUTE, 0);
         calendar.set(Calendar.SECOND, 0);
 
         long startTimestamp = calendar.getTimeInMillis();
 
+        calendar.set(Calendar.HOUR_OF_DAY, 23);
         calendar.set(Calendar.MINUTE, 59);
         calendar.set(Calendar.SECOND, 59);
+
         long endTimestamp = calendar.getTimeInMillis();
 
-        deleteJVMRelatedData(startTimestamp, endTimestamp);
-        deleteTraceRelatedData(startTimestamp, endTimestamp);
+        TimeBuckets timeBuckets = new TimeBuckets();
+        timeBuckets.startSecondTimeBucket = TimeBucketUtils.INSTANCE.getSecondTimeBucket(startTimestamp);
+        timeBuckets.endSecondTimeBucket = TimeBucketUtils.INSTANCE.getSecondTimeBucket(endTimestamp);
+
+        timeBuckets.startMinuteTimeBucket = TimeBucketUtils.INSTANCE.getMinuteTimeBucket(startTimestamp);
+        timeBuckets.endMinuteTimeBucket = TimeBucketUtils.INSTANCE.getMinuteTimeBucket(endTimestamp);
+
+        timeBuckets.startHourTimeBucket = TimeBucketUtils.INSTANCE.minuteToHour(timeBuckets.startMinuteTimeBucket);
+        timeBuckets.endHourTimeBucket = TimeBucketUtils.INSTANCE.minuteToHour(timeBuckets.endMinuteTimeBucket);
+
+        timeBuckets.startDayTimeBucket = TimeBucketUtils.INSTANCE.minuteToDay(timeBuckets.startMinuteTimeBucket);
+        timeBuckets.endDayTimeBucket = TimeBucketUtils.INSTANCE.minuteToDay(timeBuckets.endMinuteTimeBucket);
+
+        timeBuckets.startMonthTimeBucket = TimeBucketUtils.INSTANCE.minuteToMonth(timeBuckets.startMinuteTimeBucket);
+        timeBuckets.endMonthTimeBucket = TimeBucketUtils.INSTANCE.minuteToMonth(timeBuckets.endMinuteTimeBucket);
+
+        return timeBuckets;
     }
 
-    private void deleteJVMRelatedData(long startTimestamp, long endTimestamp) {
-        ICpuMetricPersistenceDAO cpuMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(ICpuMetricPersistenceDAO.class);
-        cpuMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+    private void deleteAlarmRelatedData(TimeBuckets timeBuckets) {
+        moduleManager.find(StorageModule.NAME).getService(IApplicationAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
 
-        IGCMetricPersistenceDAO gcMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IGCMetricPersistenceDAO.class);
-        gcMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationAlarmListMinutePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationAlarmListHourPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationAlarmListDayPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationAlarmListMonthPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        IMemoryMetricPersistenceDAO memoryMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IMemoryMetricPersistenceDAO.class);
-        memoryMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
 
-        IMemoryPoolMetricPersistenceDAO memoryPoolMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IMemoryPoolMetricPersistenceDAO.class);
-        memoryPoolMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceAlarmListPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceAlarmListPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceAlarmListPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceAlarmListPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceAlarmPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceAlarmListPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
     }
 
-    private void deleteTraceRelatedData(long startTimestamp, long endTimestamp) {
-        IGlobalTracePersistenceDAO globalTracePersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IGlobalTracePersistenceDAO.class);
-        globalTracePersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+    private void deleteJVMRelatedData(TimeBuckets timeBuckets) {
+        moduleManager.find(StorageModule.NAME).getService(ICpuMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(ICpuHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(ICpuDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(ICpuMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        IInstanceMetricPersistenceDAO instanceMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IInstanceMetricPersistenceDAO.class);
-        instanceMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IGCMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IGCHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IGCDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IGCMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        IApplicationComponentPersistenceDAO applicationComponentPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IApplicationComponentPersistenceDAO.class);
-        applicationComponentPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        IApplicationMappingPersistenceDAO applicationMappingPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IApplicationMappingPersistenceDAO.class);
-        applicationMappingPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryPoolMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryPoolHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryPoolDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IMemoryPoolMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+    }
 
-        IApplicationReferenceMetricPersistenceDAO applicationReferenceMetricPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceMetricPersistenceDAO.class);
-        applicationReferenceMetricPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+    private void deleteTraceRelatedData(TimeBuckets timeBuckets) {
+        moduleManager.find(StorageModule.NAME).getService(IGlobalTracePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(ISegmentDurationPersistenceDAO.class).deleteHistory(timeBuckets.startSecondTimeBucket, timeBuckets.endSecondTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(ISegmentPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
 
-        ISegmentCostPersistenceDAO segmentCostPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(ISegmentCostPersistenceDAO.class);
-        segmentCostPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationComponentMinutePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationComponentHourPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationComponentDayPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationComponentMonthPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        ISegmentPersistenceDAO segmentPersistenceDAO = moduleManager.find(StorageModule.NAME).getService(ISegmentPersistenceDAO.class);
-        segmentPersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
 
-        IServiceReferenceMetricPersistenceDAO serviceReferencePersistenceDAO = moduleManager.find(StorageModule.NAME).getService(IServiceReferenceMetricPersistenceDAO.class);
-        serviceReferencePersistenceDAO.deleteHistory(startTimestamp, endTimestamp);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMappingMinutePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMappingHourPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMappingDayPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationMappingMonthPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IApplicationReferenceMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMappingMinutePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMappingHourPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMappingDayPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceMappingMonthPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IInstanceReferenceMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IResponseTimeDistributionMinutePersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IResponseTimeDistributionHourPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IResponseTimeDistributionDayPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IResponseTimeDistributionMonthPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceMinuteMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMinuteTimeBucket, timeBuckets.endMinuteTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceHourMetricPersistenceDAO.class).deleteHistory(timeBuckets.startHourTimeBucket, timeBuckets.endHourTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceDayMetricPersistenceDAO.class).deleteHistory(timeBuckets.startDayTimeBucket, timeBuckets.endDayTimeBucket);
+        moduleManager.find(StorageModule.NAME).getService(IServiceReferenceMonthMetricPersistenceDAO.class).deleteHistory(timeBuckets.startMonthTimeBucket, timeBuckets.endMonthTimeBucket);
+    }
+
+    class TimeBuckets {
+        private long startSecondTimeBucket;
+        private long endSecondTimeBucket;
+
+        private long startMinuteTimeBucket;
+        private long endMinuteTimeBucket;
+
+        private long startHourTimeBucket;
+        private long endHourTimeBucket;
+
+        private long startDayTimeBucket;
+        private long endDayTimeBucket;
+
+        private long startMonthTimeBucket;
+        private long endMonthTimeBucket;
     }
 }

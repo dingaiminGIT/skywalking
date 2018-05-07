@@ -16,26 +16,37 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.core.data;
 
 /**
  * @author peng-yongsheng
  */
 public class Column {
-    private final String name;
-    private final Operation operation;
+    private final ColumnName columnName;
+    private final MergeOperation mergeOperation;
+    private final FormulaOperation formulaOperation;
 
-    public Column(String name, Operation operation) {
-        this.name = name;
-        this.operation = operation;
+    public Column(ColumnName columnName, MergeOperation mergeOperation) {
+        this.columnName = columnName;
+        this.mergeOperation = mergeOperation;
+        this.formulaOperation = null;
     }
 
-    public String getName() {
-        return name;
+    public Column(ColumnName columnName, MergeOperation mergeOperation, FormulaOperation formulaOperation) {
+        this.columnName = columnName;
+        this.mergeOperation = mergeOperation;
+        this.formulaOperation = formulaOperation;
     }
 
-    public Operation getOperation() {
-        return operation;
+    public ColumnName getColumnName() {
+        return columnName;
+    }
+
+    MergeOperation getMergeOperation() {
+        return mergeOperation;
+    }
+
+    FormulaOperation getFormulaOperation() {
+        return formulaOperation;
     }
 }

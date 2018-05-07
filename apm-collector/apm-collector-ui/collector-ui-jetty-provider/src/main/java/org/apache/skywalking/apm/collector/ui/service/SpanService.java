@@ -16,21 +16,21 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.ui.service;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.List;
 import org.apache.skywalking.apm.collector.cache.CacheModule;
-import org.apache.skywalking.apm.collector.core.module.ModuleManager;
-import org.apache.skywalking.apm.collector.core.util.Const;
-import org.apache.skywalking.apm.collector.storage.dao.ISegmentUIDAO;
-import org.apache.skywalking.apm.network.trace.component.ComponentsDefine;
 import org.apache.skywalking.apm.collector.cache.service.ApplicationCacheService;
 import org.apache.skywalking.apm.collector.cache.service.ServiceNameCacheService;
+import org.apache.skywalking.apm.collector.configuration.ConfigurationModule;
+import org.apache.skywalking.apm.collector.configuration.service.IComponentLibraryCatalogService;
+import org.apache.skywalking.apm.collector.core.module.ModuleManager;
 import org.apache.skywalking.apm.collector.core.util.StringUtils;
 import org.apache.skywalking.apm.collector.storage.StorageModule;
+import org.apache.skywalking.apm.collector.storage.dao.ui.ISegmentUIDAO;
+import org.apache.skywalking.apm.collector.storage.table.register.ServiceName;
 import org.apache.skywalking.apm.network.proto.KeyWithStringValue;
 import org.apache.skywalking.apm.network.proto.LogMessage;
 import org.apache.skywalking.apm.network.proto.SpanObject;
@@ -44,11 +44,13 @@ public class SpanService {
     private final ISegmentUIDAO segmentDAO;
     private final ServiceNameCacheService serviceNameCacheService;
     private final ApplicationCacheService applicationCacheService;
+    private final IComponentLibraryCatalogService componentLibraryCatalogService;
 
     public SpanService(ModuleManager moduleManager) {
         this.segmentDAO = moduleManager.find(StorageModule.NAME).getService(ISegmentUIDAO.class);
         this.serviceNameCacheService = moduleManager.find(CacheModule.NAME).getService(ServiceNameCacheService.class);
         this.applicationCacheService = moduleManager.find(CacheModule.NAME).getService(ApplicationCacheService.class);
+        this.componentLibraryCatalogService = moduleManager.find(ConfigurationModule.NAME).getService(IComponentLibraryCatalogService.class);
     }
 
     public JsonObject load(String segmentId, int spanId) {
@@ -60,9 +62,9 @@ public class SpanService {
             if (spanId == spanObject.getSpanId()) {
                 String operationName = spanObject.getOperationName();
                 if (spanObject.getOperationNameId() != 0) {
-                    String serviceName = serviceNameCacheService.get(spanObject.getOperationNameId());
+                    ServiceName serviceName = serviceNameCacheService.get(spanObject.getOperationNameId());
                     if (StringUtils.isNotEmpty(serviceName)) {
-                        operationName = serviceName.split(Const.ID_SPLIT)[1];
+                        operationName = serviceName.getServiceName();
                     }
                 }
                 spanJson.addProperty("operationName", operationName);
@@ -99,7 +101,7 @@ public class SpanService {
                 if (spanObject.getComponentId() == 0) {
                     componentJson.addProperty("value", spanObject.getComponent());
                 } else {
-                    componentJson.addProperty("value", ComponentsDefine.getInstance().getComponentName(spanObject.getComponentId()));
+                    componentJson.addProperty("value", this.componentLibraryCatalogService.getComponentName(spanObject.getComponentId()));
                 }
                 tagsArray.add(componentJson);
 
@@ -108,7 +110,7 @@ public class SpanService {
                 if (spanObject.getPeerId() == 0) {
                     peerJson.addProperty("value", spanObject.getPeer());
                 } else {
-                    peerJson.addProperty("value", applicationCacheService.get(spanObject.getPeerId()));
+                    peerJson.addProperty("value", applicationCacheService.getApplicationById(spanObject.getPeerId()).getApplicationCode());
                 }
                 tagsArray.add(peerJson);
 

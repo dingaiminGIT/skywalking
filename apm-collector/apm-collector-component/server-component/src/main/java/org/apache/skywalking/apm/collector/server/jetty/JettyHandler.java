@@ -16,52 +16,61 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.server.jetty;
 
 import com.google.gson.JsonElement;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Enumeration;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
+import org.apache.skywalking.apm.collector.server.ServerHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.servlet.*;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.skywalking.apm.collector.core.util.ObjectUtils;
-import org.apache.skywalking.apm.collector.server.ServerHandler;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Enumeration;
+
+import static java.util.Objects.nonNull;
 
 /**
  * @author peng-yongsheng
  */
 public abstract class JettyHandler extends HttpServlet implements ServerHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(JettyHandler.class);
+
     public abstract String pathSpec();
 
     @Override
-    protected final void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected final void doGet(HttpServletRequest req, HttpServletResponse resp) {
         try {
             reply(resp, doGet(req));
-        } catch (ArgumentsParseException e) {
-            replyError(resp, e.getMessage(), HttpServletResponse.SC_BAD_REQUEST);
+        } catch (ArgumentsParseException | IOException e) {
+            try {
+                replyError(resp, e.getMessage(), HttpServletResponse.SC_BAD_REQUEST);
+            } catch (IOException replyException) {
+                logger.error(replyException.getMessage(), e);
+            }
         }
     }
 
     protected abstract JsonElement doGet(HttpServletRequest req) throws ArgumentsParseException;
 
     @Override
-    protected final void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected final void doPost(HttpServletRequest req, HttpServletResponse resp) {
         try {
             reply(resp, doPost(req));
-        } catch (ArgumentsParseException e) {
-            replyError(resp, e.getMessage(), HttpServletResponse.SC_BAD_REQUEST);
+        } catch (ArgumentsParseException | IOException e) {
+            try {
+                replyError(resp, e.getMessage(), HttpServletResponse.SC_BAD_REQUEST);
+            } catch (IOException replyException) {
+                logger.error(replyException.getMessage(), e);
+            }
         }
     }
 
-    protected abstract JsonElement doPost(HttpServletRequest req) throws ArgumentsParseException;
+    protected abstract JsonElement doPost(HttpServletRequest req) throws ArgumentsParseException, IOException;
 
     @Override
     protected final void doHead(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -150,12 +159,12 @@ public abstract class JettyHandler extends HttpServlet implements ServerHandler 
     }
 
     private void reply(HttpServletResponse response, JsonElement resJson) throws IOException {
-        response.setContentType("text/json");
+        response.setContentType("application/json");
         response.setCharacterEncoding("utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
 
         PrintWriter out = response.getWriter();
-        if (ObjectUtils.isNotEmpty(resJson)) {
+        if (nonNull(resJson)) {
             out.print(resJson);
         }
         out.flush();
@@ -163,7 +172,7 @@ public abstract class JettyHandler extends HttpServlet implements ServerHandler 
     }
 
     private void replyError(HttpServletResponse response, String errorMessage, int status) throws IOException {
-        response.setContentType("text/plain");
+        response.setContentType("application/json");
         response.setCharacterEncoding("utf-8");
         response.setStatus(status);
         response.setHeader("error-message", errorMessage);

@@ -16,42 +16,43 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.core.util;
 
-import java.util.TimeZone;
-import org.junit.After;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
- * @author wu-sheng
+ * @author peng-yongsheng
  */
 public class TimeBucketUtilsTest {
-    @Before
-    public void setup() {
-        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
-    }
 
-    @After
-    public void teardown() {
-
+    @Test
+    public void testGetMinuteTimeBucket() throws ParseException {
+        SimpleDateFormat minuteDateFormat = new SimpleDateFormat("yyyyMMddHHmm");
+        long timeBucket = TimeBucketUtils.INSTANCE.getMinuteTimeBucket(minuteDateFormat.parse("201803010201").getTime());
+        Assert.assertEquals(201803010201L, timeBucket);
     }
 
     @Test
-    public void testGetInfoFromATimestamp() {
-        long timeMillis = 1509521745220L;
-        Assert.assertArrayEquals(new long[] {
-            20171101153545L,
-            20171101153544L,
-            20171101153543L,
-            20171101153542L,
-            20171101153541L
-        }, TimeBucketUtils.INSTANCE.getFiveSecondTimeBuckets(TimeBucketUtils.INSTANCE.getSecondTimeBucket(timeMillis)));
-        Assert.assertEquals(20171101153545L, TimeBucketUtils.INSTANCE.getSecondTimeBucket(timeMillis));
-        Assert.assertEquals(201711011535L, TimeBucketUtils.INSTANCE.getMinuteTimeBucket(timeMillis));
-        Assert.assertEquals(201711011500L, TimeBucketUtils.INSTANCE.getHourTimeBucket(timeMillis));
-        Assert.assertEquals(201711010000L, TimeBucketUtils.INSTANCE.getDayTimeBucket(timeMillis));
+    public void testGetSecondTimeBucket() throws ParseException {
+        SimpleDateFormat minuteDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+        long timeBucket = TimeBucketUtils.INSTANCE.getSecondTimeBucket(minuteDateFormat.parse("20180301020102").getTime());
+        Assert.assertEquals(20180301020102L, timeBucket);
+    }
+
+    /**
+     * Performance tests
+     * Running with vm option: -javaagent: collector-instrument-agent.jar
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+        long now = System.currentTimeMillis();
+
+        for (int i = 0; i < 500000; i++) {
+            TimeBucketUtils.INSTANCE.getMinuteTimeBucket(now);
+        }
     }
 }

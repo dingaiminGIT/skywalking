@@ -16,39 +16,26 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.ui.jetty;
 
-import java.util.Properties;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.time.OneInstanceLastTimeGetHandler;
 import org.apache.skywalking.apm.collector.cache.CacheModule;
 import org.apache.skywalking.apm.collector.cluster.ClusterModule;
 import org.apache.skywalking.apm.collector.cluster.service.ModuleListenerService;
 import org.apache.skywalking.apm.collector.cluster.service.ModuleRegisterService;
-import org.apache.skywalking.apm.collector.core.module.Module;
+import org.apache.skywalking.apm.collector.configuration.ConfigurationModule;
+import org.apache.skywalking.apm.collector.core.module.ModuleDefine;
+import org.apache.skywalking.apm.collector.core.module.ModuleConfig;
 import org.apache.skywalking.apm.collector.core.module.ModuleProvider;
-import org.apache.skywalking.apm.collector.core.module.ServiceNotProvidedException;
 import org.apache.skywalking.apm.collector.jetty.manager.JettyManagerModule;
 import org.apache.skywalking.apm.collector.jetty.manager.service.JettyManagerService;
 import org.apache.skywalking.apm.collector.naming.NamingModule;
 import org.apache.skywalking.apm.collector.naming.service.NamingHandlerRegisterService;
-import org.apache.skywalking.apm.collector.server.Server;
+import org.apache.skywalking.apm.collector.server.jetty.JettyServer;
 import org.apache.skywalking.apm.collector.storage.StorageModule;
 import org.apache.skywalking.apm.collector.ui.UIModule;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.SegmentTopGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.SpanGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.TraceDagGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.TraceStackGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.application.ApplicationsGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.instancehealth.InstanceHealthGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.instancemetric.InstanceMetricGetOneTimeBucketHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.instancemetric.InstanceMetricGetRangeTimeBucketHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.instancemetric.InstanceOsInfoGetHandler;
+import org.apache.skywalking.apm.collector.ui.jetty.handler.GraphQLHandler;
 import org.apache.skywalking.apm.collector.ui.jetty.handler.naming.UIJettyNamingHandler;
 import org.apache.skywalking.apm.collector.ui.jetty.handler.naming.UIJettyNamingListener;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.servicetree.EntryServiceGetHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.servicetree.ServiceTreeGetByIdHandler;
-import org.apache.skywalking.apm.collector.ui.jetty.handler.time.AllInstanceLastTimeGetHandler;
 
 /**
  * @author peng-yongsheng
@@ -56,28 +43,31 @@ import org.apache.skywalking.apm.collector.ui.jetty.handler.time.AllInstanceLast
 public class UIModuleJettyProvider extends ModuleProvider {
 
     public static final String NAME = "jetty";
-    private static final String HOST = "host";
-    private static final String PORT = "port";
-    private static final String CONTEXT_PATH = "context_path";
+    private final UIModuleJettyConfig config;
+
+    public UIModuleJettyProvider() {
+        super();
+        this.config = new UIModuleJettyConfig();
+    }
 
     @Override public String name() {
         return NAME;
     }
 
-    @Override public Class<? extends Module> module() {
+    @Override public Class<? extends ModuleDefine> module() {
         return UIModule.class;
     }
 
-    @Override public void prepare(Properties config) throws ServiceNotProvidedException {
+    @Override public ModuleConfig createConfigBeanIfAbsent() {
+        return config;
     }
 
-    @Override public void start(Properties config) throws ServiceNotProvidedException {
-        String host = config.getProperty(HOST);
-        Integer port = (Integer)config.get(PORT);
-        String contextPath = config.getProperty(CONTEXT_PATH);
+    @Override public void prepare() {
+    }
 
+    @Override public void start() {
         ModuleRegisterService moduleRegisterService = getManager().find(ClusterModule.NAME).getService(ModuleRegisterService.class);
-        moduleRegisterService.register(UIModule.NAME, this.name(), new UIModuleJettyRegistration(host, port, contextPath));
+        moduleRegisterService.register(UIModule.NAME, this.name(), new UIModuleJettyRegistration(config.getHost(), config.getPort(), config.getContextPath()));
 
         UIJettyNamingListener namingListener = new UIJettyNamingListener();
         ModuleListenerService moduleListenerService = getManager().find(ClusterModule.NAME).getService(ModuleListenerService.class);
@@ -87,31 +77,18 @@ public class UIModuleJettyProvider extends ModuleProvider {
         namingHandlerRegisterService.register(new UIJettyNamingHandler(namingListener));
 
         JettyManagerService managerService = getManager().find(JettyManagerModule.NAME).getService(JettyManagerService.class);
-        Server jettyServer = managerService.createIfAbsent(host, port, contextPath);
+        JettyServer jettyServer = managerService.createIfAbsent(config.getHost(), config.getPort(), config.getContextPath());
         addHandlers(jettyServer);
     }
 
-    @Override public void notifyAfterCompleted() throws ServiceNotProvidedException {
-
+    @Override public void notifyAfterCompleted() {
     }
 
     @Override public String[] requiredModules() {
-        return new String[] {ClusterModule.NAME, JettyManagerModule.NAME, NamingModule.NAME, CacheModule.NAME, StorageModule.NAME};
+        return new String[] {ConfigurationModule.NAME, ClusterModule.NAME, JettyManagerModule.NAME, NamingModule.NAME, CacheModule.NAME, StorageModule.NAME};
     }
 
-    private void addHandlers(Server jettyServer) {
-        jettyServer.addHandler(new ApplicationsGetHandler(getManager()));
-        jettyServer.addHandler(new InstanceHealthGetHandler(getManager()));
-        jettyServer.addHandler(new InstanceMetricGetOneTimeBucketHandler(getManager()));
-        jettyServer.addHandler(new InstanceMetricGetRangeTimeBucketHandler(getManager()));
-        jettyServer.addHandler(new InstanceOsInfoGetHandler(getManager()));
-        jettyServer.addHandler(new EntryServiceGetHandler(getManager()));
-        jettyServer.addHandler(new ServiceTreeGetByIdHandler(getManager()));
-        jettyServer.addHandler(new AllInstanceLastTimeGetHandler(getManager()));
-        jettyServer.addHandler(new OneInstanceLastTimeGetHandler(getManager()));
-        jettyServer.addHandler(new SegmentTopGetHandler(getManager()));
-        jettyServer.addHandler(new SpanGetHandler(getManager()));
-        jettyServer.addHandler(new TraceDagGetHandler(getManager()));
-        jettyServer.addHandler(new TraceStackGetHandler(getManager()));
+    private void addHandlers(JettyServer jettyServer) {
+        jettyServer.addHandler(new GraphQLHandler(getManager()));
     }
 }

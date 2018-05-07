@@ -16,7 +16,6 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.core.module;
 
 import java.util.ArrayList;
@@ -28,26 +27,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author wu-sheng
+ * @author wu-sheng, peng-yongsheng
  */
-public class BootstrapFlow {
-    private final Logger logger = LoggerFactory.getLogger(BootstrapFlow.class);
+class BootstrapFlow {
+    private static final Logger logger = LoggerFactory.getLogger(BootstrapFlow.class);
 
-    private Map<String, Module> loadedModules;
-    private ApplicationConfiguration applicationConfiguration;
+    private Map<String, ModuleDefine> loadedModules;
     private List<ModuleProvider> startupSequence;
 
-    public BootstrapFlow(Map<String, Module> loadedModules,
-        ApplicationConfiguration applicationConfiguration) throws CycleDependencyException {
+    BootstrapFlow(Map<String, ModuleDefine> loadedModules) throws CycleDependencyException {
         this.loadedModules = loadedModules;
-        this.applicationConfiguration = applicationConfiguration;
         startupSequence = new LinkedList<>();
 
         makeSequence();
     }
 
-    void start(ModuleManager moduleManager,
-        ApplicationConfiguration configuration) throws ProviderNotFoundException, ModuleNotFoundException, ServiceNotProvidedException {
+    @SuppressWarnings("unchecked")
+    void start(
+        ModuleManager moduleManager) throws ModuleNotFoundException, ServiceNotProvidedException, ModuleStartException {
         for (ModuleProvider provider : startupSequence) {
             String[] requiredModules = provider.requiredModules();
             if (requiredModules != null) {
@@ -61,11 +58,11 @@ public class BootstrapFlow {
             logger.info("start the provider {} in {} module.", provider.name(), provider.getModuleName());
             provider.requiredCheck(provider.getModule().services());
 
-            provider.start(configuration.getModuleConfiguration(provider.getModuleName()).getProviderConfiguration(provider.name()));
+            provider.start();
         }
     }
 
-    void notifyAfterCompleted() throws ProviderNotFoundException, ModuleNotFoundException, ServiceNotProvidedException {
+    void notifyAfterCompleted() throws ServiceNotProvidedException {
         for (ModuleProvider provider : startupSequence) {
             provider.notifyAfterCompleted();
         }
@@ -73,13 +70,9 @@ public class BootstrapFlow {
 
     private void makeSequence() throws CycleDependencyException {
         List<ModuleProvider> allProviders = new ArrayList<>();
-        loadedModules.forEach((moduleName, module) -> {
-            module.providers().forEach(provider -> {
-                allProviders.add(provider);
-            });
-        });
+        loadedModules.forEach((moduleName, module) -> allProviders.addAll(module.providers()));
 
-        while (true) {
+        do {
             int numOfToBeSequenced = allProviders.size();
             for (int i = 0; i < allProviders.size(); i++) {
                 ModuleProvider provider = allProviders.get(i);
@@ -114,15 +107,11 @@ public class BootstrapFlow {
             }
 
             if (numOfToBeSequenced == allProviders.size()) {
-                StringBuilder unsequencedProviders = new StringBuilder();
-                allProviders.forEach(provider -> {
-                    unsequencedProviders.append(provider.getModuleName()).append("[provider=").append(provider.getClass().getName()).append("]\n");
-                });
-                throw new CycleDependencyException("Exist cycle module dependencies in \n" + unsequencedProviders.substring(0, unsequencedProviders.length() - 1));
-            }
-            if (allProviders.size() == 0) {
-                break;
+                StringBuilder unSequencedProviders = new StringBuilder();
+                allProviders.forEach(provider -> unSequencedProviders.append(provider.getModuleName()).append("[provider=").append(provider.getClass().getName()).append("]\n"));
+                throw new CycleDependencyException("Exist cycle module dependencies in \n" + unSequencedProviders.substring(0, unSequencedProviders.length() - 1));
             }
         }
+        while (allProviders.size() != 0);
     }
 }

@@ -16,19 +16,19 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.cache.guava.service;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import org.apache.skywalking.apm.collector.core.util.Const;
-import org.apache.skywalking.apm.collector.core.util.ObjectUtils;
 import org.apache.skywalking.apm.collector.cache.service.ServiceIdCacheService;
 import org.apache.skywalking.apm.collector.core.module.ModuleManager;
+import org.apache.skywalking.apm.collector.core.util.Const;
 import org.apache.skywalking.apm.collector.storage.StorageModule;
-import org.apache.skywalking.apm.collector.storage.dao.IServiceNameCacheDAO;
+import org.apache.skywalking.apm.collector.storage.dao.cache.IServiceNameCacheDAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.isNull;
 
 /**
  * @author peng-yongsheng
@@ -37,7 +37,7 @@ public class ServiceIdCacheGuavaService implements ServiceIdCacheService {
 
     private final Logger logger = LoggerFactory.getLogger(ServiceIdCacheGuavaService.class);
 
-    private final Cache<String, Integer> serviceIdCache = CacheBuilder.newBuilder().maximumSize(1000).build();
+    private final Cache<String, Integer> serviceIdCache = CacheBuilder.newBuilder().maximumSize(10000).build();
 
     private final ModuleManager moduleManager;
     private IServiceNameCacheDAO serviceNameCacheDAO;
@@ -47,24 +47,25 @@ public class ServiceIdCacheGuavaService implements ServiceIdCacheService {
     }
 
     private IServiceNameCacheDAO getServiceNameCacheDAO() {
-        if (ObjectUtils.isEmpty(serviceNameCacheDAO)) {
+        if (isNull(serviceNameCacheDAO)) {
             this.serviceNameCacheDAO = moduleManager.find(StorageModule.NAME).getService(IServiceNameCacheDAO.class);
         }
         return this.serviceNameCacheDAO;
     }
 
-    public int get(int applicationId, String serviceName) {
+    @Override public int get(int applicationId, int srcSpanType, String serviceName) {
         int serviceId = 0;
+        String id = applicationId + Const.ID_SPLIT + srcSpanType + Const.ID_SPLIT + serviceName;
         try {
-            serviceId = serviceIdCache.get(applicationId + Const.ID_SPLIT + serviceName, () -> getServiceNameCacheDAO().getServiceId(applicationId, serviceName));
+            serviceId = serviceIdCache.get(id, () -> getServiceNameCacheDAO().getServiceId(applicationId, srcSpanType, serviceName));
         } catch (Throwable e) {
             logger.error(e.getMessage(), e);
         }
 
         if (serviceId == 0) {
-            serviceId = getServiceNameCacheDAO().getServiceId(applicationId, serviceName);
+            serviceId = getServiceNameCacheDAO().getServiceId(applicationId, srcSpanType, serviceName);
             if (serviceId != 0) {
-                serviceIdCache.put(applicationId + Const.ID_SPLIT + serviceName, serviceId);
+                serviceIdCache.put(id, serviceId);
             }
         }
         return serviceId;

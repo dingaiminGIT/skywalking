@@ -16,19 +16,19 @@
  *
  */
 
-
 package org.apache.skywalking.apm.collector.cache;
 
 import org.apache.skywalking.apm.collector.cache.service.ApplicationCacheService;
 import org.apache.skywalking.apm.collector.cache.service.InstanceCacheService;
+import org.apache.skywalking.apm.collector.cache.service.NetworkAddressCacheService;
 import org.apache.skywalking.apm.collector.cache.service.ServiceIdCacheService;
 import org.apache.skywalking.apm.collector.cache.service.ServiceNameCacheService;
-import org.apache.skywalking.apm.collector.core.module.Module;
+import org.apache.skywalking.apm.collector.core.module.ModuleDefine;
 
 /**
  * @author peng-yongsheng
  */
-public class CacheModule extends Module {
+public class CacheModule extends ModuleDefine {
 
     public static final String NAME = "cache";
 
@@ -37,6 +37,6 @@ public class CacheModule extends Module {
     }
 
     @Override public Class[] services() {
-        return new Class[] {ApplicationCacheService.class, InstanceCacheService.class, ServiceIdCacheService.class, ServiceNameCacheService.class};
+        return new Class[] {ApplicationCacheService.class, InstanceCacheService.class, ServiceIdCacheService.class, ServiceNameCacheService.class, NetworkAddressCacheService.class};
     }
 }
